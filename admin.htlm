@@ -1,1 +1,89 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADMIN CMS</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // --- CẤU HÌNH FIREBASE CHÍNH CHỦ ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyDezi1m5b3nuINUDYFRAeuWrTWU9Wsg-ww",
+          authDomain: "freeshop-1a344.firebaseapp.com",
+          projectId: "freeshop-1a344",
+          storageBucket: "freeshop-1a344.firebasestorage.app",
+          messagingSenderId: "181657632424",
+          appId: "1:181657632424:web:ba62630798bf7ac3614c9d"
+        };
+        // ------------------------------------
+
+        const app = initializeApp(firebaseConfig);
+        window.auth = getAuth(app);
+        window.db = getFirestore(app);
+        window.fs = { collection, addDoc };
+    </script>
+</head>
+<body class="bg-gray-800 text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const APP_ID = 'freeshop-main';
+
+        const AdminApp = () => {
+            const [user, setUser] = useState(null);
+            const [email, setE] = useState(''); const [pass, setP] = useState('');
+            const [appName, setAppName] = useState('Netflix');
+            const [bulkData, setBulkData] = useState('');
+
+            useEffect(() => window.auth.onAuthStateChanged(setUser), []);
+            const login = () => window.auth.signInWithEmailAndPassword(window.auth, email, pass).catch(e=>alert(e.message));
+
+            const addProduct = async () => {
+                if(!bulkData) return alert("Chưa nhập acc!");
+                const lines = bulkData.split('\n').filter(x => x.trim());
+                try {
+                    for(let line of lines) {
+                        const [u, p, t] = line.split('|');
+                        await window.fs.addDoc(window.fs.collection(window.db, 'artifacts', APP_ID, 'public', 'data', 'products'), {
+                            appName, type: 'free', price: 0,
+                            accountData: { user: u?.trim(), pass: p?.trim(), twoFa: t?.trim() || '' },
+                            createdAt: new Date().toISOString()
+                        });
+                    }
+                    alert(`Đã thêm ${lines.length} acc!`); setBulkData('');
+                } catch(e) { alert("Lỗi: " + e.message); }
+            };
+
+            if(!user) return <div className="p-10"><input placeholder="Email Admin" onChange={e=>setE(e.target.value)} className="bg-gray-700 p-2 text-white block mb-2"/><input type="password" placeholder="Pass" onChange={e=>setP(e.target.value)} className="bg-gray-700 p-2 text-white block mb-2"/><button onClick={login} className="bg-red-600 p-2 text-white">Login</button></div>;
+
+            return (
+                <div className="max-w-xl mx-auto p-6 space-y-6">
+                    <h1 className="text-2xl font-bold text-green-400">ADMIN CMS - AUTO SYSTEM</h1>
+                    <div className="bg-gray-700 p-4 rounded">
+                        <label className="block mb-2 text-sm text-gray-400">Chọn App</label>
+                        <select onChange={e=>setAppName(e.target.value)} className="bg-gray-800 p-2 w-full text-white mb-4 rounded">
+                            <option>Netflix</option><option>Spotify</option><option>YouTube</option>
+                        </select>
+                        
+                        <label className="block mb-2 text-sm text-gray-400">Nhập danh sách Acc (User|Pass|2FA)</label>
+                        <textarea className="w-full h-32 bg-gray-800 text-white p-2 rounded font-mono text-sm" onChange={e=>setBulkData(e.target.value)} value={bulkData}></textarea>
+                        
+                        <button onClick={addProduct} className="w-full bg-blue-600 hover:bg-blue-500 mt-4 py-2 rounded font-bold">ĐĂNG LÊN SHOP</button>
+                    </div>
+                </div>
+            );
+        };
+        ReactDOM.createRoot(document.getElementById('root')).render(<AdminApp />);
+    </script>
+</body>
+</html>
+
+
 
