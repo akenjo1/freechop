@@ -1,12 +1,9 @@
 {
-  "rewrites": [
-    { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/verify", "destination": "/verify.html" },
-    { "source": "/", "destination": "/index.html" }
-  ],
+  "version": 2,
+  "cleanUrls": true,
   "headers": [
     {
-      "source": "/(.*).html",
+      "source": "/(.*)",
       "headers": [
         {
           "key": "Content-Type",
@@ -14,5 +11,11 @@
         }
       ]
     }
+  ],
+  "routes": [
+    { "src": "/admin", "dest": "/admin.html" },
+    { "src": "/verify", "dest": "/verify.html" },
+    { "src": "/", "dest": "/index.html" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
