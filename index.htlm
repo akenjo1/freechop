@@ -1,1 +1,222 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop Acc Pro - Auto System</title>
+    <!-- Thư viện React & Tailwind -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // --- CẤU HÌNH FIREBASE (Thay của bạn vào đây) ---
+        const firebaseConfig = {
+             apiKey: "API_KEY_CUA_BAN",
+             authDomain: "PROJECT_ID.firebaseapp.com",
+             projectId: "PROJECT_ID",
+             storageBucket: "PROJECT_ID.appspot.com",
+             messagingSenderId: "SENDER_ID",
+             appId: "APP_ID"
+        };
+        // ------------------------------------------------
+
+        const app = initializeApp(typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig);
+        window.db = getFirestore(app);
+        window.auth = getAuth(app);
+        window.fs = { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, serverTimestamp };
+
+        if (typeof __initial_auth_token !== 'undefined') {
+             import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js").then(({signInWithCustomToken}) => {
+                signInWithCustomToken(window.auth, __initial_auth_token);
+             });
+        }
+    </script>
+    <style>
+        body { background-color: #111827; color: #f3f4f6; }
+        .glass { background: rgba(31, 41, 55, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(75, 85, 99, 0.4); }
+        .btn-primary { background: linear-gradient(to right, #06b6d4, #3b82f6); color: white; font-weight: bold; }
+        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 10px #eab308; } 50% { box-shadow: 0 0 20px #facc15; } }
+        .glow-effect { animation: pulse-glow 2s infinite; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-shop';
+
+        // --- CẤU HÌNH API RÚT GỌN LINK (QUAN TRỌNG) ---
+        // 1. URL API của trang rút gọn (Ví dụ: Link1s, Traffic123...)
+        const SHORTENER_API_URL = "https://traffic123.net/api"; 
+        // 2. Token API của bạn lấy từ trang rút gọn
+        const SHORTENER_API_TOKEN = "TOKEN_API_CUA_BAN_O_DAY"; 
+        
+        // 3. Link trang verify.html của bạn (Sau khi deploy lên Vercel nhớ sửa dòng này)
+        // Ví dụ: https://ten-web-cua-ban.vercel.app/verify.html
+        const MY_VERIFY_PAGE = "https://LINK_WEB_VERIFY_CUA_BAN/verify.html"; 
+        // ----------------------------------------------
+
+        const ShopApp = () => {
+            const [user, setUser] = useState(null);
+            const [products, setProducts] = useState([]);
+            
+            // State xử lý link
+            const [loadingLink, setLoadingLink] = useState(false);
+            const [shortenedLink, setShortenedLink] = useState('');
+            const [inputCode, setInputCode] = useState('');
+            const [currentProduct, setCurrentProduct] = useState(null);
+
+            useEffect(() => {
+                window.auth.onAuthStateChanged(setUser);
+                const fetch = async () => {
+                    const q = window.fs.query(
+                        window.fs.collection(window.db, 'artifacts', APP_ID, 'public', 'data', 'products'),
+                        window.fs.where('type', '==', 'free')
+                    );
+                    const snap = await window.fs.getDocs(q);
+                    setProducts(snap.docs.map(d => ({id: d.id, ...d.data()})));
+                };
+                fetch();
+            }, []);
+
+            const generateLink = async (product) => {
+                if(!user) return alert("Vui lòng đăng nhập để lấy mã!");
+                
+                setLoadingLink(true);
+                setShortenedLink('');
+                setInputCode('');
+                setCurrentProduct(product);
+
+                try {
+                    // 1. Tạo Session ID & Mã Code ngẫu nhiên (Không check IP)
+                    const randomCode = Math.floor(100000 + Math.random() * 900000).toString(); // Mã 6 số
+                    const sessionId = "sess_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6);
+
+                    // 2. Lưu Session lên Firebase
+                    await window.fs.setDoc(window.fs.doc(window.db, 'artifacts', APP_ID, 'public', 'data', 'sessions', sessionId), {
+                        code: randomCode,
+                        isUsed: false,
+                        productId: product.id,
+                        userId: user.uid,
+                        createdAt: window.fs.serverTimestamp()
+                    });
+
+                    // 3. Tạo link gốc
+                    const longUrl = `${MY_VERIFY_PAGE}?session=${sessionId}`;
+                    
+                    // 4. Gọi API Rút gọn (Auto)
+                    // Cấu trúc fetch: api?api=TOKEN&url=LINK
+                    const apiEndpoint = `${SHORTENER_API_URL}?api=${SHORTENER_API_TOKEN}&url=${encodeURIComponent(longUrl)}`;
+                    
+                    const res = await fetch(apiEndpoint);
+                    const data = await res.json();
+
+                    // Xử lý kết quả trả về (Tùy web rút gọn mà key có thể là 'shortenedUrl', 'url', 'short')
+                    if (data.shortenedUrl) setShortenedLink(data.shortenedUrl);
+                    else if (data.url) setShortenedLink(data.url);
+                    else if (data.short) setShortenedLink(data.short);
+                    else throw new Error("API lỗi hoặc Token sai!");
+
+                } catch (e) {
+                    console.error(e);
+                    alert("Lỗi tạo link: " + e.message);
+                } finally {
+                    setLoadingLink(false);
+                }
+            };
+
+            const verifyAndUnlock = async () => {
+                if(!currentProduct || !inputCode) return alert("Vui lòng nhập mã!");
+
+                try {
+                    // Tìm session có mã code này và chưa sử dụng
+                    const q = window.fs.query(
+                        window.fs.collection(window.db, 'artifacts', APP_ID, 'public', 'data', 'sessions'),
+                        window.fs.where('code', '==', inputCode.trim()),
+                        window.fs.where('isUsed', '==', false)
+                    );
+                    
+                    const snap = await window.fs.getDocs(q);
+                    
+                    if(snap.empty) return alert("Mã sai hoặc đã được sử dụng!");
+
+                    const sessionDoc = snap.docs[0];
+                    const sessionData = sessionDoc.data();
+
+                    if(sessionData.productId !== currentProduct.id) return alert("Mã này là của sản phẩm khác!");
+
+                    // Đánh dấu đã dùng
+                    await window.fs.updateDoc(sessionDoc.ref, {
+                        isUsed: true,
+                        usedAt: window.fs.serverTimestamp()
+                    });
+
+                    // Hiện thông tin acc
+                    alert(`✅ XÁC THỰC THÀNH CÔNG!\n\nUser: ${currentProduct.accountData.user}\nPass: ${currentProduct.accountData.pass}\n2FA: ${currentProduct.accountData.twoFa || 'Không'}`);
+                    
+                    // Reset
+                    setShortenedLink(''); setInputCode(''); setCurrentProduct(null);
+
+                } catch (e) { alert("Lỗi verify: " + e.message); }
+            };
+
+            return (
+                <div className="max-w-md mx-auto min-h-screen bg-gray-900 pb-10 shadow-2xl">
+                    <div className="p-4 glass sticky top-0 z-50 flex justify-between items-center">
+                        <h1 className="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">AUTO SHOP</h1>
+                        {user ? (
+                            <button onClick={()=>window.auth.signOut()} className="text-xs text-gray-400">Logout</button>
+                        ) : (
+                             <button className="bg-cyan-600 px-3 py-1 rounded text-xs font-bold text-white">Login</button>
+                        )}
+                    </div>
+
+                    <div className="p-4 space-y-4">
+                        {products.map(p => (
+                            <div key={p.id} className="glass p-4 rounded-xl hover:border-cyan-500/30 transition">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold text-lg text-white">{p.appName}</h3>
+                                    <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded font-bold">FREE LINK</span>
+                                </div>
+
+                                {currentProduct?.id === p.id && shortenedLink ? (
+                                    <div className="bg-gray-800 p-4 rounded border border-yellow-500/50 glow-effect">
+                                        <p className="text-yellow-400 text-center text-xs font-bold mb-2 uppercase">⚠️ Vượt link lấy mã (Không giới hạn IP)</p>
+                                        <a href={shortenedLink} target="_blank" className="block w-full bg-yellow-500 text-black text-center font-bold py-2 rounded mb-4 hover:bg-yellow-400">👉 BẤM VÀO ĐÂY LẤY MÃ</a>
+                                        
+                                        <div className="flex gap-2">
+                                            <input className="flex-1 bg-black border border-gray-600 rounded px-3 text-center tracking-widest text-white" placeholder="......" value={inputCode} onChange={e=>setInputCode(e.target.value)} />
+                                            <button onClick={verifyAndUnlock} className="bg-green-600 px-4 rounded font-bold text-white">OK</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button 
+                                        onClick={() => generateLink(p)} 
+                                        disabled={loadingLink}
+                                        className="w-full btn-primary py-2 rounded font-bold text-white disabled:opacity-50"
+                                    >
+                                        {loadingLink && currentProduct?.id === p.id ? "Đang tạo..." : "LẤY MÃ & NHẬN ACC"}
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                        {products.length === 0 && <p className="text-center text-gray-500">Đang tải danh sách...</p>}
+                    </div>
+                </div>
+            );
+        };
+        ReactDOM.createRoot(document.getElementById('root')).render(<ShopApp />);
+    </script>
+</body>
+</html>
+
+
 
