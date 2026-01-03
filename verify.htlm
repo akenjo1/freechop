@@ -1,1 +1,78 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lấy Mã Xác Nhận</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // --- CẤU HÌNH FIREBASE CHÍNH CHỦ ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyDezi1m5b3nuINUDYFRAeuWrTWU9Wsg-ww",
+          authDomain: "freeshop-1a344.firebaseapp.com",
+          projectId: "freeshop-1a344",
+          storageBucket: "freeshop-1a344.firebasestorage.app",
+          messagingSenderId: "181657632424",
+          appId: "1:181657632424:web:ba62630798bf7ac3614c9d"
+        };
+        // ------------------------------------
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const APP_ID = 'freeshop-main';
+
+        async function getCode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get('session');
+            const statusEl = document.getElementById('status');
+            const codeEl = document.getElementById('code-area');
+            const codeVal = document.getElementById('code-val');
+
+            if (!sessionId) {
+                statusEl.innerText = "Lỗi: Link thiếu Session ID";
+                statusEl.className = "text-red-500 font-bold";
+                return;
+            }
+
+            try {
+                const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'sessions', sessionId);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    statusEl.style.display = 'none';
+                    codeEl.classList.remove('hidden');
+                    codeVal.innerText = docSnap.data().code;
+                } else {
+                    statusEl.innerText = "Mã phiên không tồn tại!";
+                    statusEl.className = "text-red-500 font-bold";
+                }
+            } catch (error) {
+                console.error(error);
+                statusEl.innerText = "Lỗi kết nối Server";
+                statusEl.className = "text-red-500";
+            }
+        }
+        getCode();
+    </script>
+</head>
+<body class="bg-gray-900 min-h-screen flex items-center justify-center text-white">
+    <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center border border-gray-700">
+        <h1 class="text-xl font-bold mb-4 text-cyan-400">HỆ THỐNG AUTO LINK</h1>
+        <p id="status" class="animate-pulse text-gray-400">Đang lấy mã...</p>
+        
+        <div id="code-area" class="hidden">
+            <p class="text-sm text-gray-400 mb-2">Mã xác nhận của bạn:</p>
+            <div class="bg-black border border-green-500 p-4 rounded-lg cursor-pointer" onclick="navigator.clipboard.writeText(this.innerText); alert('Đã copy!')">
+                <span id="code-val" class="text-4xl font-mono text-green-400 font-bold tracking-widest select-all">...</span>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Bấm vào mã để copy, sau đó quay lại Shop.</p>
+        </div>
+    </div>
+</body>
+</html>
+
+
 
