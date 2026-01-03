@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shop Acc Pro - Auto System</title>
-    <!-- Thư viện React & Tailwind -->
+    <title>Shop Acc Pro - ShrinkMe Auto</title>
+    <!-- React & Tailwind -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -16,27 +16,21 @@
         import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // --- CẤU HÌNH FIREBASE (Thay của bạn vào đây) ---
+        // --- CẤU HÌNH FIREBASE CHÍNH CHỦ CỦA BẠN ---
         const firebaseConfig = {
-             apiKey: "API_KEY_CUA_BAN",
-             authDomain: "PROJECT_ID.firebaseapp.com",
-             projectId: "PROJECT_ID",
-             storageBucket: "PROJECT_ID.appspot.com",
-             messagingSenderId: "SENDER_ID",
-             appId: "APP_ID"
+          apiKey: "AIzaSyDezi1m5b3nuINUDYFRAeuWrTWU9Wsg-ww",
+          authDomain: "freeshop-1a344.firebaseapp.com",
+          projectId: "freeshop-1a344",
+          storageBucket: "freeshop-1a344.firebasestorage.app",
+          messagingSenderId: "181657632424",
+          appId: "1:181657632424:web:ba62630798bf7ac3614c9d"
         };
-        // ------------------------------------------------
+        // ---------------------------------------------
 
-        const app = initializeApp(typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig);
+        const app = initializeApp(firebaseConfig);
         window.db = getFirestore(app);
         window.auth = getAuth(app);
         window.fs = { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, serverTimestamp };
-
-        if (typeof __initial_auth_token !== 'undefined') {
-             import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js").then(({signInWithCustomToken}) => {
-                signInWithCustomToken(window.auth, __initial_auth_token);
-             });
-        }
     </script>
     <style>
         body { background-color: #111827; color: #f3f4f6; }
@@ -51,28 +45,46 @@
 
     <script type="text/babel">
         const { useState, useEffect } = React;
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-shop';
+        const APP_ID = 'freeshop-main'; // ID định danh ứng dụng
 
-        // --- CẤU HÌNH API RÚT GỌN LINK (QUAN TRỌNG) ---
-        // 1. URL API của trang rút gọn (Ví dụ: Link1s, Traffic123...)
-        const SHORTENER_API_URL = "https://traffic123.net/api"; 
-        // 2. Token API của bạn lấy từ trang rút gọn
-        const SHORTENER_API_TOKEN = "TOKEN_API_CUA_BAN_O_DAY"; 
+        // --- CẤU HÌNH SHRINKME.IO ---
+        const SHORTENER_API_URL = "https://shrinkme.io/api"; 
+        const SHORTENER_API_TOKEN = "a16ba54df502d11a43d8e2b10f2d2fbb9b8e29f7"; 
         
-        // 3. Link trang verify.html của bạn (Sau khi deploy lên Vercel nhớ sửa dòng này)
-        // Ví dụ: https://ten-web-cua-ban.vercel.app/verify.html
-        const MY_VERIFY_PAGE = "https://LINK_WEB_VERIFY_CUA_BAN/verify.html"; 
-        // ----------------------------------------------
+        // --- QUAN TRỌNG: SỬA LINK NÀY SAU KHI DEPLOY LÊN VERCEL ---
+        // Ví dụ: https://shop-acc-cuatoi.vercel.app/verify.html
+        const MY_VERIFY_PAGE = "https://TEN_APP_TREN_VERCEL.vercel.app/verify.html"; 
+        // ----------------------------------------------------------
+
+        // Component Modal Thông Báo (Thay thế alert)
+        const Notification = ({ msg, type, onClose }) => {
+            if (!msg) return null;
+            const colors = type === 'success' ? 'border-green-500 text-green-400' : 'border-red-500 text-red-400';
+            return (
+                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] animate-bounce-in">
+                    <div className={`bg-gray-800 border ${colors} px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3`}>
+                        <span className="font-bold">{msg}</span>
+                        <button onClick={onClose} className="text-gray-500 hover:text-white">✕</button>
+                    </div>
+                </div>
+            );
+        };
 
         const ShopApp = () => {
             const [user, setUser] = useState(null);
             const [products, setProducts] = useState([]);
+            const [notification, setNotification] = useState({ msg: '', type: '' });
             
             // State xử lý link
             const [loadingLink, setLoadingLink] = useState(false);
             const [shortenedLink, setShortenedLink] = useState('');
             const [inputCode, setInputCode] = useState('');
             const [currentProduct, setCurrentProduct] = useState(null);
+
+            const notify = (msg, type = 'success') => {
+                setNotification({ msg, type });
+                setTimeout(() => setNotification({ msg: '', type: '' }), 4000);
+            };
 
             useEffect(() => {
                 window.auth.onAuthStateChanged(setUser);
@@ -88,7 +100,7 @@
             }, []);
 
             const generateLink = async (product) => {
-                if(!user) return alert("Vui lòng đăng nhập để lấy mã!");
+                if(!user) return notify("Vui lòng đăng nhập để lấy mã!", "error");
                 
                 setLoadingLink(true);
                 setShortenedLink('');
@@ -96,8 +108,8 @@
                 setCurrentProduct(product);
 
                 try {
-                    // 1. Tạo Session ID & Mã Code ngẫu nhiên (Không check IP)
-                    const randomCode = Math.floor(100000 + Math.random() * 900000).toString(); // Mã 6 số
+                    // 1. Tạo Session ID & Mã Code ngẫu nhiên
+                    const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
                     const sessionId = "sess_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6);
 
                     // 2. Lưu Session lên Firebase
@@ -110,34 +122,37 @@
                     });
 
                     // 3. Tạo link gốc
+                    if (MY_VERIFY_PAGE.includes("TEN_APP_TREN_VERCEL")) {
+                        throw new Error("Bạn chưa sửa MY_VERIFY_PAGE trong code!");
+                    }
                     const longUrl = `${MY_VERIFY_PAGE}?session=${sessionId}`;
                     
-                    // 4. Gọi API Rút gọn (Auto)
-                    // Cấu trúc fetch: api?api=TOKEN&url=LINK
-                    const apiEndpoint = `${SHORTENER_API_URL}?api=${SHORTENER_API_TOKEN}&url=${encodeURIComponent(longUrl)}`;
+                    // 4. Gọi API ShrinkMe.io
+                    // ShrinkMe dùng tham số &format=json để trả về JSON
+                    const apiEndpoint = `${SHORTENER_API_URL}?api=${SHORTENER_API_TOKEN}&url=${encodeURIComponent(longUrl)}&format=json`;
                     
                     const res = await fetch(apiEndpoint);
                     const data = await res.json();
 
-                    // Xử lý kết quả trả về (Tùy web rút gọn mà key có thể là 'shortenedUrl', 'url', 'short')
-                    if (data.shortenedUrl) setShortenedLink(data.shortenedUrl);
-                    else if (data.url) setShortenedLink(data.url);
-                    else if (data.short) setShortenedLink(data.short);
-                    else throw new Error("API lỗi hoặc Token sai!");
+                    if (data.status === 'success' && data.shortenedUrl) {
+                        setShortenedLink(data.shortenedUrl);
+                    } else {
+                        console.error("API Error:", data);
+                        throw new Error("Không thể rút gọn link. Kiểm tra lại API Token.");
+                    }
 
                 } catch (e) {
                     console.error(e);
-                    alert("Lỗi tạo link: " + e.message);
+                    notify(e.message, "error");
                 } finally {
                     setLoadingLink(false);
                 }
             };
 
             const verifyAndUnlock = async () => {
-                if(!currentProduct || !inputCode) return alert("Vui lòng nhập mã!");
+                if(!currentProduct || !inputCode) return notify("Vui lòng nhập mã!", "error");
 
                 try {
-                    // Tìm session có mã code này và chưa sử dụng
                     const q = window.fs.query(
                         window.fs.collection(window.db, 'artifacts', APP_ID, 'public', 'data', 'sessions'),
                         window.fs.where('code', '==', inputCode.trim()),
@@ -146,12 +161,12 @@
                     
                     const snap = await window.fs.getDocs(q);
                     
-                    if(snap.empty) return alert("Mã sai hoặc đã được sử dụng!");
+                    if(snap.empty) return notify("Mã sai hoặc đã được sử dụng!", "error");
 
                     const sessionDoc = snap.docs[0];
                     const sessionData = sessionDoc.data();
 
-                    if(sessionData.productId !== currentProduct.id) return alert("Mã này là của sản phẩm khác!");
+                    if(sessionData.productId !== currentProduct.id) return notify("Mã này là của sản phẩm khác!", "error");
 
                     // Đánh dấu đã dùng
                     await window.fs.updateDoc(sessionDoc.ref, {
@@ -165,13 +180,15 @@
                     // Reset
                     setShortenedLink(''); setInputCode(''); setCurrentProduct(null);
 
-                } catch (e) { alert("Lỗi verify: " + e.message); }
+                } catch (e) { notify("Lỗi verify: " + e.message, "error"); }
             };
 
             return (
                 <div className="max-w-md mx-auto min-h-screen bg-gray-900 pb-10 shadow-2xl">
+                    <Notification msg={notification.msg} type={notification.type} onClose={() => setNotification({msg:'', type:''})} />
+                    
                     <div className="p-4 glass sticky top-0 z-50 flex justify-between items-center">
-                        <h1 className="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">AUTO SHOP</h1>
+                        <h1 className="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">SHOP AUTO</h1>
                         {user ? (
                             <button onClick={()=>window.auth.signOut()} className="text-xs text-gray-400">Logout</button>
                         ) : (
@@ -184,12 +201,12 @@
                             <div key={p.id} className="glass p-4 rounded-xl hover:border-cyan-500/30 transition">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="font-bold text-lg text-white">{p.appName}</h3>
-                                    <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded font-bold">FREE LINK</span>
+                                    <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded font-bold">SHRINKME AUTO</span>
                                 </div>
 
                                 {currentProduct?.id === p.id && shortenedLink ? (
                                     <div className="bg-gray-800 p-4 rounded border border-yellow-500/50 glow-effect">
-                                        <p className="text-yellow-400 text-center text-xs font-bold mb-2 uppercase">⚠️ Vượt link lấy mã (Không giới hạn IP)</p>
+                                        <p className="text-yellow-400 text-center text-xs font-bold mb-2 uppercase">⚠️ Vượt link ShrinkMe để lấy mã</p>
                                         <a href={shortenedLink} target="_blank" className="block w-full bg-yellow-500 text-black text-center font-bold py-2 rounded mb-4 hover:bg-yellow-400">👉 BẤM VÀO ĐÂY LẤY MÃ</a>
                                         
                                         <div className="flex gap-2">
@@ -203,7 +220,7 @@
                                         disabled={loadingLink}
                                         className="w-full btn-primary py-2 rounded font-bold text-white disabled:opacity-50"
                                     >
-                                        {loadingLink && currentProduct?.id === p.id ? "Đang tạo..." : "LẤY MÃ & NHẬN ACC"}
+                                        {loadingLink && currentProduct?.id === p.id ? "Đang tạo link..." : "LẤY MÃ & NHẬN ACC"}
                                     </button>
                                 )}
                             </div>
@@ -217,6 +234,5 @@
     </script>
 </body>
 </html>
-
 
 
